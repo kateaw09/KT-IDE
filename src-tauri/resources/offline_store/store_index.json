@@ -1,0 +1,29 @@
+{
+  "version": "1.0.0",
+  "libraries": [
+    {
+      "name": "RobotCore",
+      "version": "2.1.0",
+      "author": "KT-Robotics",
+      "description": "Standard Offline Differential Drive and Sensor Control Library",
+      "archive": "libraries_repo/RobotCore.zip",
+      "installed": true
+    },
+    {
+      "name": "MotorDriver",
+      "version": "1.4.0",
+      "author": "KT-Robotics",
+      "description": "L298N / TB6612FNG Dual H-Bridge Motor Control",
+      "archive": "libraries_repo/MotorDriver.zip",
+      "installed": true
+    },
+    {
+      "name": "IMU_MPU6050",
+      "version": "1.2.0",
+      "author": "InvenSense / KT",
+      "description": "6-DOF IMU Pitch and Roll Gyroscope / Accelerometer",
+      "archive": "libraries_repo/IMU_MPU6050.zip",
+      "installed": true
+    }
+  ]
+}

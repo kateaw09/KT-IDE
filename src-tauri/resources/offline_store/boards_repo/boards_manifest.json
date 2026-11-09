@@ -1,0 +1,34 @@
+{
+  "boards": [
+    {
+      "id": "uno",
+      "name": "Arduino Uno / Nano (ATmega328P)",
+      "mcu": "atmega328p",
+      "fCpu": "16000000L",
+      "protocol": "arduino",
+      "baudRate": 115200,
+      "core": "arduino:avr",
+      "variant": "standard"
+    },
+    {
+      "id": "mega2560",
+      "name": "Arduino Mega 2560 (ATmega2560)",
+      "mcu": "atmega2560",
+      "fCpu": "16000000L",
+      "protocol": "wiring",
+      "baudRate": 115200,
+      "core": "arduino:avr",
+      "variant": "mega"
+    },
+    {
+      "id": "custom_bot",
+      "name": "KT-Bot Pro Differential (Custom AVR)",
+      "mcu": "atmega328p",
+      "fCpu": "16000000L",
+      "protocol": "arduino",
+      "baudRate": 115200,
+      "core": "kt_robotics:avr",
+      "variant": "kt_bot_v2"
+    }
+  ]
+}
