@@ -17,6 +17,9 @@ import {
   Maximize2,
   Minimize2,
   AlertTriangle,
+  MapPin,
+  RotateCw,
+  Undo2,
 } from 'lucide-react';
 
 export const FieldSimulator3D: React.FC = () => {
@@ -31,6 +34,12 @@ export const FieldSimulator3D: React.FC = () => {
     robotConfig,
     robotState,
     setRobotPose,
+    setRobotCell,
+    rotateRobot,
+    customStartPose,
+    resetRobotToStartTile,
+    placementMode,
+    setPlacementMode,
     simStatus,
     trail,
     stepEngine,
@@ -41,7 +50,6 @@ export const FieldSimulator3D: React.FC = () => {
   const [cameraMode, setCameraMode] = useState<'iso' | 'top' | 'follow'>('iso');
   const [lightingMode, setLightingMode] = useState<'studio' | 'cyber'>('studio');
   const [autoRotate, setAutoRotate] = useState<boolean>(false);
-  const [placementMode, setPlacementMode] = useState<'tile' | 'robot'>('tile');
   const [hoveredCell, setHoveredCell] = useState<{ row: number; col: number } | null>(null);
   const [showCenterSplit, setShowCenterSplit] = useState<boolean>(true);
   const pointerDownPos = useRef<{ x: number; y: number } | null>(null);
@@ -873,6 +881,12 @@ export const FieldSimulator3D: React.FC = () => {
         0.5,
         -FIELD_HEIGHT_CM / 2 + cell.row * TILE_SIZE_CM + TILE_SIZE_CM / 2
       );
+      const isRobot = useSimulatorStore.getState().placementMode === 'robot';
+      const mat = hoverBoxRef.current.material as THREE.MeshStandardMaterial;
+      if (mat) {
+        mat.color.setHex(isRobot ? 0xf59e0b : 0x06b6d4);
+        mat.emissive.setHex(isRobot ? 0xd97706 : 0x0891b2);
+      }
       hoverBoxRef.current.visible = true;
     } else {
       setHoveredCell(null);
@@ -909,12 +923,16 @@ export const FieldSimulator3D: React.FC = () => {
     if (!cell) return;
 
     if (e.button === 2) {
-      // Normal Right Click: Rotate Tile 90°
-      rotateTile(cell.row, cell.col);
-    } else if (e.button === 0) {
-      // Left Click: Place selected Tile immediately!
+      // Normal Right Click: Rotate robot if in robot placement mode, otherwise rotate tile 90°
       if (placementMode === 'robot') {
-        setRobotPose(cell.cmX, cell.cmY);
+        rotateRobot(90);
+      } else {
+        rotateTile(cell.row, cell.col);
+      }
+    } else if (e.button === 0) {
+      // Left Click: Place robot centered in selected tile if in robot mode, otherwise place selected tile
+      if (placementMode === 'robot') {
+        setRobotCell(cell.row, cell.col);
       } else {
         setTileType(cell.row, cell.col, activeTool, activeRotation);
       }
@@ -980,7 +998,7 @@ export const FieldSimulator3D: React.FC = () => {
 
       {/* Top Floating HUD Controls */}
       <div className="absolute top-2.5 left-2.5 right-2.5 flex items-center justify-between pointer-events-none gap-2 select-none overflow-x-auto">
-        {/* Left: View Mode Pills (Only essential 3D Orbit and Top-Down) */}
+        {/* Left: View Mode Pills (Only essential 3D Orbit and Top-Down) + Robot Mode */}
         <div className="flex items-center gap-1 bg-surface-darker/90 backdrop-blur-md p-1 rounded-xl border border-white/10 shadow-xl pointer-events-auto text-xs shrink-0 whitespace-nowrap">
           <button
             onClick={() => setCameraView('iso')}
@@ -1003,14 +1021,51 @@ export const FieldSimulator3D: React.FC = () => {
             <Eye size={12} />
             <span>Top-Down</span>
           </button>
+
+          <div className="w-[1px] h-3.5 bg-white/10 mx-0.5" />
+
+          {/* Placement Mode Toggle in HUD */}
+          <button
+            onClick={() => setPlacementMode(placementMode === 'robot' ? 'tile' : 'robot')}
+            className={`flex items-center gap-1 px-2.5 py-1 rounded-lg font-medium transition ${
+              placementMode === 'robot'
+                ? 'bg-amber-500 text-slate-950 font-bold shadow-md shadow-amber-500/25 animate-pulse'
+                : 'text-slate-400 hover:text-white'
+            }`}
+            title={placementMode === 'robot' ? 'โหมดย้ายหุ่นยนต์กำลังทำงาน (คลิกสนามเพื่อวาง)' : 'คลิกเพื่อเปิดโหมดย้ายตำแหน่งหุ่นยนต์'}
+          >
+            <MapPin size={12} />
+            <span>{placementMode === 'robot' ? 'วางหุ่น...' : 'ย้ายหุ่น'}</span>
+          </button>
         </div>
 
-        {/* Center: Selected Tile Name & Rotation ONLY (Clean & Minimal) */}
-        <div className="flex items-center gap-1.5 bg-surface-darker/95 backdrop-blur-md px-3 py-1.5 rounded-xl border border-white/10 shadow-xl pointer-events-auto text-xs text-slate-200 shrink-0">
-          <span className="w-2 h-2 rounded-full bg-emerald-400"></span>
-          <span className="font-semibold text-brand-300 font-mono text-xs">{activeTool}</span>
-          <span className="text-amber-400 font-mono text-xs">({activeRotation}°)</span>
-        </div>
+        {/* Center: Selected Tile Name & Rotation OR Robot Placement Hint */}
+        {placementMode === 'robot' ? (
+          <div className="flex items-center gap-2 bg-amber-500/20 backdrop-blur-md px-3 py-1.5 rounded-xl border border-amber-500/40 shadow-xl pointer-events-auto text-xs text-amber-200 shrink-0">
+            <span className="w-2 h-2 rounded-full bg-amber-400 animate-ping"></span>
+            <span className="font-semibold text-amber-300">คลิกที่ช่องเพื่อวางหุ่น</span>
+            <button
+              onClick={() => rotateRobot(90)}
+              className="flex items-center gap-1 px-2 py-0.5 rounded-lg bg-amber-500/30 hover:bg-amber-500/50 text-white font-medium text-[11px] border border-amber-400/30 transition"
+              title="หมุนหุ่นยนต์ 90° (หรือคลิกขวาที่ช่องสนาม)"
+            >
+              <RotateCw size={11} />
+              <span>หมุน 90° ({Math.round((((robotState.theta * 180) / Math.PI) % 360 + 360) % 360)}°)</span>
+            </button>
+            <button
+              onClick={() => setPlacementMode('tile')}
+              className="px-2 py-0.5 rounded-lg bg-surface-dark hover:bg-surface-card text-slate-300 text-[11px] border border-white/20 transition"
+            >
+              เสร็จสิ้น
+            </button>
+          </div>
+        ) : (
+          <div className="flex items-center gap-1.5 bg-surface-darker/95 backdrop-blur-md px-3 py-1.5 rounded-xl border border-white/10 shadow-xl pointer-events-auto text-xs text-slate-200 shrink-0">
+            <span className="w-2 h-2 rounded-full bg-emerald-400"></span>
+            <span className="font-semibold text-brand-300 font-mono text-xs">{activeTool}</span>
+            <span className="text-amber-400 font-mono text-xs">({activeRotation}°)</span>
+          </div>
+        )}
 
         {/* Right: Prominent "เต็มจอ" (Full Screen Builder) Button */}
         <div className="flex items-center pointer-events-auto shrink-0 whitespace-nowrap">

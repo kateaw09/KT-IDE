@@ -14,7 +14,7 @@ import {
   TILE_SIZE_CM,
 } from '../../sim-engine/physics';
 import { useSimulatorStore } from '../../store/useSimulatorStore';
-import { RotateCw, RefreshCw, Layers, Sparkles, AlertTriangle } from 'lucide-react';
+import { RotateCw, RefreshCw, Layers, Sparkles, AlertTriangle, MapPin, Undo2 } from 'lucide-react';
 
 export const FieldSimulator4x8: React.FC = () => {
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
@@ -28,6 +28,12 @@ export const FieldSimulator4x8: React.FC = () => {
     robotConfig,
     robotState,
     setRobotPose,
+    setRobotCell,
+    rotateRobot,
+    customStartPose,
+    resetRobotToStartTile,
+    placementMode,
+    setPlacementMode,
     simStatus,
     trail,
     stepEngine,
@@ -35,7 +41,6 @@ export const FieldSimulator4x8: React.FC = () => {
   } = useSimulatorStore();
 
   const [isMouseDown, setIsMouseDown] = useState(false);
-  const [placementMode, setPlacementMode] = useState<'tile' | 'robot'>('tile');
   const [hoveredCell, setHoveredCell] = useState<{ row: number; col: number } | null>(null);
 
   // Animation Frame Loop
@@ -97,7 +102,7 @@ export const FieldSimulator4x8: React.FC = () => {
       const { row, col, cmX, cmY } = cellInfo;
 
       if (placementMode === 'robot') {
-        setRobotPose(cmX, cmY);
+        setRobotCell(row, col);
         return;
       }
 
@@ -105,12 +110,16 @@ export const FieldSimulator4x8: React.FC = () => {
         setTileType(row, col, activeTool, activeRotation);
       }
     },
-    [placementMode, setRobotPose, activeTool, activeRotation, setTileType]
+    [placementMode, setRobotCell, activeTool, activeRotation, setTileType]
   );
 
-  // Right-click rotates cell by 90 deg
+  // Right-click: rotates robot if in robot mode, else rotates cell by 90 deg
   const handleContextMenu = (e: React.MouseEvent<HTMLCanvasElement>) => {
     e.preventDefault();
+    if (placementMode === 'robot') {
+      rotateRobot(90);
+      return;
+    }
     const cellInfo = getCellFromMouse(e);
     if (!cellInfo) return;
     const { row, col } = cellInfo;
@@ -686,17 +695,40 @@ export const FieldSimulator4x8: React.FC = () => {
             <span>สนามทางการ</span>
           </button>
 
+          {/* Rotate Robot button */}
+          <button
+            onClick={() => rotateRobot(90)}
+            className="flex items-center gap-1 px-2.5 py-1 rounded bg-surface-card hover:bg-slate-700 text-slate-200 border border-surface-border text-[11px] font-medium transition"
+            title="หมุนตัวหุ่นยนต์ 90 องศา (หรือคลิกขวาที่สนามในโหมดย้ายหุ่น)"
+          >
+            <RotateCw size={11} className="text-teal-400" />
+            <span>หมุนหุ่น ({Math.round((((robotState.theta * 180) / Math.PI) % 360 + 360) % 360)}°)</span>
+          </button>
+
           {/* Place Bot Mode Toggle */}
           <button
             onClick={() => setPlacementMode(placementMode === 'robot' ? 'tile' : 'robot')}
-            className={`px-2.5 py-1 rounded text-[11px] font-medium transition ${
+            className={`flex items-center gap-1 px-2.5 py-1 rounded text-[11px] font-medium transition ${
               placementMode === 'robot'
-                ? 'bg-emerald-600 text-white animate-pulse'
+                ? 'bg-amber-500 text-slate-950 font-bold animate-pulse'
                 : 'bg-surface-card hover:bg-slate-700 text-slate-300 border border-surface-border'
             }`}
+            title="คลิกวางตำแหน่งหุ่นยนต์บนช่องใดก็ได้ในสนาม"
           >
-            {placementMode === 'robot' ? 'คลิกสนามเพื่อวางหุ่น' : 'จัดวางตำแหน่งหุ่น'}
+            <MapPin size={11} />
+            <span>{placementMode === 'robot' ? 'คลิกสนามเพื่อวาง' : 'ย้ายหุ่น'}</span>
           </button>
+
+          {customStartPose && (
+            <button
+              onClick={resetRobotToStartTile}
+              className="flex items-center gap-1 px-2 py-1 rounded bg-rose-500/20 hover:bg-rose-500/30 text-rose-300 border border-rose-500/30 text-[11px] font-medium transition"
+              title="คืนค่าตำแหน่งและทิศทางหุ่นยนต์กลับไปที่แผ่น START ของสนาม"
+            >
+              <Undo2 size={11} />
+              <span>จุด START เดิม</span>
+            </button>
+          )}
         </div>
       </div>
 

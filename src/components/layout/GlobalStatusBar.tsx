@@ -88,7 +88,7 @@ export const GlobalStatusBar: React.FC = () => {
 
       {/* Center Credit */}
       <div className="hidden lg:flex items-center text-[10px] text-slate-500 font-sans">
-        <span>©KT-IDE v0.1.0 | Develop By&nbsp;</span>
+        <span>©KT-IDE v0.1.1 | Develop By&nbsp;</span>
         <a
           href="https://kateaw.com"
           target="_blank"

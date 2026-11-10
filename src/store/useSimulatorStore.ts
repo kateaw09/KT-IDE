@@ -152,8 +152,16 @@ interface SimulatorStoreState {
 
   robotConfig: RobotConfig;
   robotState: RobotState;
+  customStartPose: { x: number; y: number; theta: number } | null;
+  placementMode: 'tile' | 'robot';
+  setPlacementMode: (mode: 'tile' | 'robot') => void;
   resetRobot: () => void;
   setRobotPose: (x: number, y: number, thetaDeg?: number) => void;
+  setRobotStartPose: (x: number, y: number, thetaDeg?: number) => void;
+  setRobotCell: (row: number, col: number) => void;
+  rotateRobot: (deltaDeg?: number) => void;
+  setRobotAngle: (angleDeg: number) => void;
+  resetRobotToStartTile: () => void;
 
   simStatus: SimStatus;
   setSimStatus: (status: SimStatus) => void;
@@ -225,6 +233,7 @@ export const useSimulatorStore = create<SimulatorStoreState>((set, get) => ({
     set({
       tiles: newTiles,
       fieldName: name || get().fieldName,
+      customStartPose: null,
       trail: [],
       robotState: {
         ...INITIAL_ROBOT_STATE,
@@ -330,12 +339,15 @@ export const useSimulatorStore = create<SimulatorStoreState>((set, get) => ({
 
   robotConfig: DEFAULT_ROBOT_CONFIG,
   robotState: INITIAL_ROBOT_STATE,
+  customStartPose: null,
+  placementMode: 'tile',
+  setPlacementMode: (mode) => set({ placementMode: mode }),
 
   resetRobot: () => {
     try {
       (window as any).__kt_useIDEStore?.getState?.()?.setExecutionStep?.(null);
     } catch (e) {}
-    const initPose = getInitialRobotPose(get().tiles);
+    const initPose = get().customStartPose || getInitialRobotPose(get().tiles);
     set({
       robotState: {
         ...INITIAL_ROBOT_STATE,
@@ -352,17 +364,92 @@ export const useSimulatorStore = create<SimulatorStoreState>((set, get) => ({
   },
 
   setRobotPose: (x, y, thetaDeg) => {
+    const curTheta = get().robotState.theta;
+    const theta = thetaDeg !== undefined ? (thetaDeg * Math.PI) / 180 : curTheta;
     set((state) => ({
+      customStartPose: state.simStatus !== 'running' ? { x, y, theta } : state.customStartPose,
       robotState: {
         ...state.robotState,
         x,
         y,
-        theta: thetaDeg !== undefined ? (thetaDeg * Math.PI) / 180 : state.robotState.theta,
+        theta,
         isFoul: false,
         foulReason: undefined,
         foulLocation: undefined,
       },
     }));
+  },
+
+  setRobotStartPose: (x, y, thetaDeg) => {
+    const curTheta = get().robotState.theta;
+    const theta = thetaDeg !== undefined ? (thetaDeg * Math.PI) / 180 : curTheta;
+    set((state) => ({
+      customStartPose: { x, y, theta },
+      robotState: {
+        ...state.robotState,
+        x,
+        y,
+        theta,
+        isFoul: false,
+        foulReason: undefined,
+        foulLocation: undefined,
+      },
+      trail: [{ x, y }],
+    }));
+  },
+
+  setRobotCell: (row, col) => {
+    const clampedRow = Math.max(0, Math.min(3, row));
+    const clampedCol = Math.max(0, Math.min(7, col));
+    const x = clampedCol * 30 + 15;
+    const y = clampedRow * 30 + 15;
+    const theta = get().robotState.theta;
+    set((state) => ({
+      customStartPose: { x, y, theta },
+      robotState: {
+        ...state.robotState,
+        x,
+        y,
+        isFoul: false,
+        foulReason: undefined,
+        foulLocation: undefined,
+      },
+      trail: [{ x, y }],
+    }));
+  },
+
+  rotateRobot: (deltaDeg = 90) => {
+    const curDeg = Math.round((get().robotState.theta * 180) / Math.PI);
+    const newDeg = ((curDeg + deltaDeg) % 360 + 360) % 360;
+    const newTheta = (newDeg * Math.PI) / 180;
+    set((state) => ({
+      customStartPose: state.simStatus !== 'running'
+        ? { x: state.robotState.x, y: state.robotState.y, theta: newTheta }
+        : state.customStartPose,
+      robotState: {
+        ...state.robotState,
+        theta: newTheta,
+      },
+    }));
+  },
+
+  setRobotAngle: (angleDeg) => {
+    const normDeg = ((angleDeg % 360) + 360) % 360;
+    const newTheta = (normDeg * Math.PI) / 180;
+    set((state) => ({
+      customStartPose: state.simStatus !== 'running'
+        ? { x: state.robotState.x, y: state.robotState.y, theta: newTheta }
+        : state.customStartPose,
+      robotState: {
+        ...state.robotState,
+        theta: newTheta,
+      },
+    }));
+  },
+
+  resetRobotToStartTile: () => {
+    set({ customStartPose: null });
+    get().resetRobot();
   },
 
   simStatus: 'idle',
@@ -384,7 +471,7 @@ export const useSimulatorStore = create<SimulatorStoreState>((set, get) => ({
       steps = parseCCodeToMotionSteps(cCode);
     }
 
-    const initPose = getInitialRobotPose(get().tiles);
+    const initPose = get().customStartPose || getInitialRobotPose(get().tiles);
     set({
       robotState: {
         ...INITIAL_ROBOT_STATE,
@@ -417,7 +504,7 @@ export const useSimulatorStore = create<SimulatorStoreState>((set, get) => ({
 
   startSimulationWithFiles: (files: SketchFile[], activeFileId?: string) => {
     const steps = parseProjectToMotionSteps(files, activeFileId);
-    const initPose = getInitialRobotPose(get().tiles);
+    const initPose = get().customStartPose || getInitialRobotPose(get().tiles);
     set({
       robotState: {
         ...INITIAL_ROBOT_STATE,
@@ -476,7 +563,7 @@ export const useSimulatorStore = create<SimulatorStoreState>((set, get) => ({
     }
 
     // Get starting coordinates
-    const initialPose = getInitialRobotPose(tiles);
+    const initialPose = get().customStartPose || getInitialRobotPose(tiles);
     let currX = initialPose.x;
     let currY = initialPose.y;
     let currTheta = initialPose.theta;
